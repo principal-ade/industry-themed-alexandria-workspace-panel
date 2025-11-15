@@ -54,7 +54,18 @@ import type {
 export type { Workspace, WorkspaceMembership, AlexandriaEntry, GithubRepository };
 
 /**
+ * Repository selected event payload
+ * Emitted when a repository card is clicked for preview/context purposes
+ */
+export interface RepositorySelectedPayload {
+  repositoryId: string;
+  repository: AlexandriaEntry;
+  repositoryPath: string;
+}
+
+/**
  * Repository opened event payload
+ * Emitted when explicitly opening a repository (e.g., via Open button)
  */
 export interface RepositoryOpenedPayload {
   repositoryId: string;

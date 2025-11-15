@@ -38,10 +38,26 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const [isRemoving, setIsRemoving] = useState(false);
   const [copiedPath, setCopiedPath] = useState(false);
 
+  const handleSelectRepository = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+
+    // Emit repository:selected event for preview/context purposes
+    events.emit({
+      type: 'repository:selected',
+      source: 'workspace-repositories-panel',
+      timestamp: Date.now(),
+      payload: {
+        repositoryId: repository.github?.id || repository.name,
+        repository: repository,
+        repositoryPath: repository.path,
+      },
+    });
+  };
+
   const handleOpenRepository = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
 
-    // Emit event using framework's PanelEvent structure
+    // Emit repository:opened event for opening repository dashboard
     events.emit({
       type: 'repository:opened',
       source: 'workspace-repositories-panel',
@@ -109,7 +125,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
         cursor: 'pointer',
         transition: 'background-color 0.15s',
       }}
-      onClick={handleOpenRepository}
+      onClick={handleSelectRepository}
       onMouseEnter={(event) => {
         event.currentTarget.style.backgroundColor =
           theme.colors.backgroundTertiary || theme.colors.backgroundSecondary;
