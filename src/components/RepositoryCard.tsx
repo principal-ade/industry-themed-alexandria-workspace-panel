@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '@a24z/industry-theme';
-import { FolderOpen, X, Copy, Check, Loader2 } from 'lucide-react';
+import { FolderOpen, X, Copy, Check, Loader2, Home, AlertTriangle, MoveRight } from 'lucide-react';
 import type { AlexandriaEntry, Workspace } from '@a24z/core-library';
 import type { PanelActions, PanelEventEmitter } from '../types';
 import { getLanguageColor } from '../utils/languageColors';
@@ -37,6 +37,28 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   const { theme } = useTheme();
   const [isRemoving, setIsRemoving] = useState(false);
   const [copiedPath, setCopiedPath] = useState(false);
+  const [isInWorkspaceDirectory, setIsInWorkspaceDirectory] = useState<boolean | null>(null);
+  const [isMoving, setIsMoving] = useState(false);
+
+  // Check if repository is in workspace directory
+  useEffect(() => {
+    const checkLocation = async () => {
+      if (!workspace?.id || !actions.isRepositoryInWorkspaceDirectory) {
+        setIsInWorkspaceDirectory(null);
+        return;
+      }
+
+      try {
+        const result = await actions.isRepositoryInWorkspaceDirectory(repository, workspace.id);
+        setIsInWorkspaceDirectory(result);
+      } catch (error) {
+        console.error('Failed to check repository location:', error);
+        setIsInWorkspaceDirectory(null);
+      }
+    };
+
+    checkLocation();
+  }, [repository, workspace, actions]);
 
   const handleSelectRepository = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -104,6 +126,33 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
       setTimeout(() => setCopiedPath(false), 2000);
     } catch (err) {
       console.error('Failed to copy path:', err);
+    }
+  };
+
+  const handleMoveToWorkspace = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!workspace?.id || !actions.moveRepositoryToWorkspaceDirectory) return;
+
+    if (
+      !confirm(
+        `Move ${repository.name} to ${workspace.suggestedClonePath}?\n\nThis will move all files to the workspace directory.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setIsMoving(true);
+      await actions.moveRepositoryToWorkspaceDirectory(repository, workspace.id);
+      setIsInWorkspaceDirectory(true);
+    } catch (error) {
+      console.error('Failed to move repository:', error);
+      alert(
+        `Failed to move repository: ${error instanceof Error ? error.message : String(error)}`
+      );
+    } finally {
+      setIsMoving(false);
     }
   };
 
@@ -284,6 +333,79 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           alignItems: 'center',
         }}
       >
+        {/* Location indicator */}
+        {workspace && workspace.suggestedClonePath && isInWorkspaceDirectory !== null && (
+          <div
+            title={
+              isInWorkspaceDirectory
+                ? `In workspace directory: ${workspace.suggestedClonePath}`
+                : 'Outside workspace directory'
+            }
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '24px',
+              height: '24px',
+              borderRadius: '4px',
+              backgroundColor: isInWorkspaceDirectory
+                ? `${theme.colors.success || '#10b981'}15`
+                : `${theme.colors.warning || '#f59e0b'}15`,
+              color: isInWorkspaceDirectory
+                ? theme.colors.success || '#10b981'
+                : theme.colors.warning || '#f59e0b',
+            }}
+          >
+            {isInWorkspaceDirectory ? <Home size={14} /> : <AlertTriangle size={14} />}
+          </div>
+        )}
+
+        {/* Move to workspace button */}
+        {workspace && workspace.suggestedClonePath && isInWorkspaceDirectory === false && (
+          <button
+            type="button"
+            onClick={handleMoveToWorkspace}
+            disabled={isMoving}
+            title={`Move to ${workspace.suggestedClonePath}`}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '6px 10px',
+              gap: '4px',
+              borderRadius: '4px',
+              border: `1px solid ${theme.colors.primary || '#3b82f6'}`,
+              backgroundColor: `${theme.colors.primary || '#3b82f6'}15`,
+              color: theme.colors.primary || '#3b82f6',
+              fontSize: `${theme.fontSizes[0]}px`,
+              fontWeight: theme.fontWeights.medium,
+              cursor: isMoving ? 'wait' : 'pointer',
+              opacity: isMoving ? 0.6 : 1,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(event) => {
+              if (!isMoving) {
+                event.currentTarget.style.backgroundColor = `${theme.colors.primary || '#3b82f6'}25`;
+              }
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.backgroundColor = `${theme.colors.primary || '#3b82f6'}15`;
+            }}
+          >
+            {isMoving ? (
+              <Loader2
+                size={12}
+                style={{
+                  animation: 'spin 1s linear infinite',
+                }}
+              />
+            ) : (
+              <MoveRight size={12} />
+            )}
+            {isMoving ? 'Moving...' : 'Move'}
+          </button>
+        )}
+
         {/* Open button */}
         <button
           type="button"

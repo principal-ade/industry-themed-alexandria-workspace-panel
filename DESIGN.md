@@ -88,6 +88,8 @@ NPM Panel Package
 **Features:**
 - Show workspace details (name, description, home directory)
 - List all repositories in workspace
+- Detect repository location relative to workspace home directory
+- Move repositories to workspace home directory
 - Remove repository from workspace
 - Repository cards with actions
 - Empty state handling (no workspace, no repositories)
@@ -119,6 +121,8 @@ NPM Panel Package
 - Repository avatar/icon (owner/org)
 - Name, path, language, description
 - Copy path to clipboard
+- Location indicator (shows if repo is inside/outside workspace home directory)
+- Move to workspace button (when repo is outside workspace directory)
 - Action buttons (open, remove)
 
 **Props:**
@@ -226,10 +230,25 @@ interface WorkspaceRepositoriesPanelActions extends PanelActions {
   // Repository membership management
   removeRepositoryFromWorkspace(repoId: string, workspaceId: string): Promise<void>;
 
+  // Repository location management
+  isRepositoryInWorkspaceDirectory(repository: AlexandriaEntry, workspaceId: string): Promise<boolean | null>;
+  moveRepositoryToWorkspaceDirectory(repository: AlexandriaEntry, workspaceId: string): Promise<string>;
+
   // Utilities
   copyToClipboard(text: string): Promise<void>;
 }
 ```
+
+**Action Details:**
+
+- **`removeRepositoryFromWorkspace`**: Removes a repository from workspace membership (does not delete files)
+- **`isRepositoryInWorkspaceDirectory`**: Checks if a repository is located inside the workspace's home directory
+  - Returns `true` if inside, `false` if outside, `null` if workspace has no home directory
+- **`moveRepositoryToWorkspaceDirectory`**: Physically moves repository files to the workspace's home directory
+  - Returns the new path after successful move
+  - Handles repository monitoring, git watching, and registry updates
+  - Includes rollback on failure
+- **`copyToClipboard`**: Copies text to system clipboard
 
 **Note:**
 - Data fetching is handled by the host via data slices, not by panel actions. The panel reacts to data slice updates rather than fetching data.
@@ -865,15 +884,15 @@ const handleCopyPath = async (e: React.MouseEvent) => {
 
 **Modification:** Use `actions.copyToClipboard(entry.path)` instead of direct clipboard API.
 
-#### Action Buttons Section (Simplified for v1.0)
+#### Action Buttons Section
 Lines 378-588 - Action buttons
 
-**Copy for v1.0:**
-- ~~Location indicator~~ (not needed without workspace directory concept)
-- ~~Move to workspace button~~ (not needed)
-- **Open button** (lines 453-507) - **Modify to emit event**
+**Implemented features:**
+- **Location indicator** - Shows if repository is inside/outside workspace home directory (green home icon / yellow warning icon)
+- **Move to workspace button** - Appears when repository is outside workspace directory, allows moving repo to workspace home
+- **Open button** (lines 453-507) - **Modified to emit event**
 - **Remove button** (lines 509-553) - **Keep as-is**
-- ~~Delete Alexandria entry button~~ (defer to v2.0)
+- ~~Delete Alexandria entry button~~ (defer to future version)
 
 **Open Button - Modified:**
 ```typescript

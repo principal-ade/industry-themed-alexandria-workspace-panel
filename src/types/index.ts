@@ -33,6 +33,10 @@ export interface PanelActions extends FrameworkPanelActions {
   removeRepositoryFromWorkspace?(repositoryId: string, workspaceId: string): Promise<void>;
   /** Copy text to clipboard */
   copyToClipboard?(text: string): Promise<void>;
+  /** Check if repository is in workspace directory */
+  isRepositoryInWorkspaceDirectory?(repository: AlexandriaEntry, workspaceId: string): Promise<boolean | null>;
+  /** Move repository to workspace directory */
+  moveRepositoryToWorkspaceDirectory?(repository: AlexandriaEntry, workspaceId: string): Promise<string>;
 }
 
 /**
