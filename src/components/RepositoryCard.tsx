@@ -26,6 +26,7 @@ export interface RepositoryCardProps {
   workspace?: Workspace | null;
   actions: PanelActions;
   events: PanelEventEmitter;
+  isEditMode?: boolean;
 }
 
 export const RepositoryCard: React.FC<RepositoryCardProps> = ({
@@ -33,6 +34,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
   workspace,
   actions,
   events,
+  isEditMode = false,
 }) => {
   const { theme } = useTheme();
   const [isRemoving, setIsRemoving] = useState(false);
@@ -333,8 +335,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           alignItems: 'center',
         }}
       >
-        {/* Location indicator */}
-        {workspace && workspace.suggestedClonePath && isInWorkspaceDirectory !== null && (
+        {/* Location indicator - only show in edit mode */}
+        {isEditMode && workspace && workspace.suggestedClonePath && isInWorkspaceDirectory !== null && (
           <div
             title={
               isInWorkspaceDirectory
@@ -360,8 +362,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </div>
         )}
 
-        {/* Move to workspace button */}
-        {workspace && workspace.suggestedClonePath && isInWorkspaceDirectory === false && (
+        {/* Move to workspace button - only show in edit mode */}
+        {isEditMode && workspace && workspace.suggestedClonePath && isInWorkspaceDirectory === false && (
           <button
             type="button"
             onClick={handleMoveToWorkspace}
@@ -406,7 +408,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           </button>
         )}
 
-        {/* Open button */}
+        {/* Open button - always visible */}
         <button
           type="button"
           onClick={handleOpenRepository}
@@ -437,8 +439,8 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = ({
           Open
         </button>
 
-        {/* Remove from workspace button */}
-        {workspace && (
+        {/* Remove from workspace button - only show in edit mode */}
+        {isEditMode && workspace && (
           <button
             type="button"
             onClick={handleRemoveFromWorkspace}

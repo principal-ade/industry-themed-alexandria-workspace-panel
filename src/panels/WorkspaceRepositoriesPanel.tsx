@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useTheme } from '@a24z/industry-theme';
-import { Folder, Home } from 'lucide-react';
+import { Folder, Home, Pencil, AlertTriangle } from 'lucide-react';
 import type { PanelComponentProps, Workspace, AlexandriaEntry } from '../types';
 import { RepositoryCard } from '../components/RepositoryCard';
 
@@ -10,6 +10,10 @@ export const WorkspaceRepositoriesPanel: React.FC<PanelComponentProps> = ({
   events,
 }) => {
   const { theme } = useTheme();
+  const [isEditMode, setIsEditMode] = React.useState(false);
+  const [repositoryLocations, setRepositoryLocations] = React.useState<Map<string, boolean>>(
+    new Map()
+  );
 
   // Get data from context using framework's getSlice pattern
   const workspaceSlice = context.getSlice<Workspace>('workspace');
@@ -23,6 +27,52 @@ export const WorkspaceRepositoriesPanel: React.FC<PanelComponentProps> = ({
     const repos = repositoriesSlice?.data ?? [];
     return [...repos].sort((a, b) => a.name.localeCompare(b.name));
   }, [repositoriesSlice?.data]);
+
+  // Check locations for all repositories
+  useEffect(() => {
+    const checkLocations = async () => {
+      if (!workspace?.id || !actions.isRepositoryInWorkspaceDirectory || !sortedRepositories.length) {
+        return;
+      }
+
+      const locationMap = new Map<string, boolean>();
+      await Promise.all(
+        sortedRepositories.map(async (repo) => {
+          try {
+            const isInWorkspace = await actions.isRepositoryInWorkspaceDirectory!(repo, workspace.id);
+            if (isInWorkspace !== null) {
+              locationMap.set(repo.path, isInWorkspace);
+            }
+          } catch (error) {
+            console.error(`Failed to check location for ${repo.name}:`, error);
+          }
+        })
+      );
+      setRepositoryLocations(locationMap);
+    };
+
+    checkLocations();
+  }, [workspace, sortedRepositories, actions]);
+
+  // Group repositories by location
+  const { repositoriesInWorkspace, repositoriesOutsideWorkspace } = useMemo(() => {
+    const inWorkspace: AlexandriaEntry[] = [];
+    const outsideWorkspace: AlexandriaEntry[] = [];
+
+    sortedRepositories.forEach((repo) => {
+      const isInWorkspace = repositoryLocations.get(repo.path);
+      if (isInWorkspace === true) {
+        inWorkspace.push(repo);
+      } else if (isInWorkspace === false) {
+        outsideWorkspace.push(repo);
+      } else {
+        // If we don't know the location yet, don't show it in either section
+        // It will appear once the location check completes
+      }
+    });
+
+    return { repositoriesInWorkspace: inWorkspace, repositoriesOutsideWorkspace: outsideWorkspace };
+  }, [sortedRepositories, repositoryLocations]);
 
   const baseContainerStyle: React.CSSProperties = {
     display: 'flex',
@@ -136,6 +186,10 @@ export const WorkspaceRepositoriesPanel: React.FC<PanelComponentProps> = ({
     );
   }
 
+  const handleToggleEditMode = () => {
+    setIsEditMode(!isEditMode);
+  };
+
   return (
     <div style={contentContainerStyle}>
       {/* Workspace header */}
@@ -149,18 +203,62 @@ export const WorkspaceRepositoriesPanel: React.FC<PanelComponentProps> = ({
             marginBottom: '4px',
           }}
         >
-          {/* Left: Workspace name */}
-          <h3
+          {/* Left: Workspace name with edit button */}
+          <div
             style={{
-              margin: 0,
-              fontSize: `${theme.fontSizes[2]}px`,
-              fontWeight: theme.fontWeights.semibold,
-              color: theme.colors.text,
-              fontFamily: theme.fonts.body,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
             }}
           >
-            {workspace.name}
-          </h3>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: `${theme.fontSizes[2]}px`,
+                fontWeight: theme.fontWeights.semibold,
+                color: theme.colors.text,
+                fontFamily: theme.fonts.body,
+              }}
+            >
+              {workspace.name}
+            </h3>
+            <button
+              type="button"
+              onClick={handleToggleEditMode}
+              title={isEditMode ? 'Exit edit mode' : 'Edit workspace'}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '24px',
+                height: '24px',
+                padding: 0,
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: isEditMode
+                  ? theme.colors.backgroundTertiary || theme.colors.backgroundSecondary
+                  : 'transparent',
+                color: isEditMode ? theme.colors.primary : theme.colors.textSecondary,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(event) => {
+                if (!isEditMode) {
+                  event.currentTarget.style.backgroundColor =
+                    theme.colors.backgroundTertiary || theme.colors.backgroundSecondary;
+                  event.currentTarget.style.color = theme.colors.text;
+                }
+              }}
+              onMouseLeave={(event) => {
+                if (!isEditMode) {
+                  event.currentTarget.style.backgroundColor = 'transparent';
+                  event.currentTarget.style.color = theme.colors.textSecondary;
+                }
+              }}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
 
           {/* Right: Home directory (read-only display) */}
           {workspace.suggestedClonePath && (
@@ -218,20 +316,9 @@ export const WorkspaceRepositoriesPanel: React.FC<PanelComponentProps> = ({
           overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px',
+          gap: '12px',
         }}
       >
-        {/* Repository list */}
-        {sortedRepositories.map((repository) => (
-          <RepositoryCard
-            key={repository.path}
-            repository={repository}
-            workspace={workspace}
-            actions={actions}
-            events={events}
-          />
-        ))}
-
         {/* Empty state */}
         {sortedRepositories.length === 0 && !isLoading && (
           <div
@@ -242,6 +329,118 @@ export const WorkspaceRepositoriesPanel: React.FC<PanelComponentProps> = ({
             }}
           >
             <p style={{ margin: 0 }}>No repositories in this workspace.</p>
+          </div>
+        )}
+
+        {/* Repositories in workspace directory */}
+        {repositoriesInWorkspace.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                paddingBottom: '4px',
+              }}
+            >
+              <Home
+                size={14}
+                style={{
+                  color: theme.colors.success || '#10b981',
+                  flexShrink: 0,
+                }}
+              />
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: `${theme.fontSizes[1]}px`,
+                  fontWeight: theme.fontWeights.semibold,
+                  color: theme.colors.textSecondary,
+                  fontFamily: theme.fonts.body,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                In Workspace Directory
+              </h4>
+              <span
+                style={{
+                  fontSize: `${theme.fontSizes[0]}px`,
+                  color: theme.colors.textTertiary || theme.colors.textSecondary,
+                  fontWeight: theme.fontWeights.medium,
+                }}
+              >
+                {repositoriesInWorkspace.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {repositoriesInWorkspace.map((repository) => (
+                <RepositoryCard
+                  key={repository.path}
+                  repository={repository}
+                  workspace={workspace}
+                  actions={actions}
+                  events={events}
+                  isEditMode={isEditMode}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Repositories outside workspace directory */}
+        {repositoriesOutsideWorkspace.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                paddingBottom: '4px',
+              }}
+            >
+              <AlertTriangle
+                size={14}
+                style={{
+                  color: theme.colors.warning || '#f59e0b',
+                  flexShrink: 0,
+                }}
+              />
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: `${theme.fontSizes[1]}px`,
+                  fontWeight: theme.fontWeights.semibold,
+                  color: theme.colors.textSecondary,
+                  fontFamily: theme.fonts.body,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Outside Workspace Directory
+              </h4>
+              <span
+                style={{
+                  fontSize: `${theme.fontSizes[0]}px`,
+                  color: theme.colors.textTertiary || theme.colors.textSecondary,
+                  fontWeight: theme.fontWeights.medium,
+                }}
+              >
+                {repositoriesOutsideWorkspace.length}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {repositoriesOutsideWorkspace.map((repository) => (
+                <RepositoryCard
+                  key={repository.path}
+                  repository={repository}
+                  workspace={workspace}
+                  actions={actions}
+                  events={events}
+                  isEditMode={isEditMode}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
