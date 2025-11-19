@@ -1,6 +1,6 @@
 {
   "name": "@industry-theme/alexandria-workspace-panel",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Workspace and repository management panel for Panel Framework V2",
   "type": "module",
   "main": "dist/panels.bundle.js",
